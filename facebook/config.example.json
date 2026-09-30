@@ -1,0 +1,6 @@
+{
+  "api_base_url": "http://127.0.0.1:8010",
+  "search_url_template": "https://www.facebook.com/marketplace/111676465517390/search/?query={query}",
+  "search_term": "iphone 11",
+  "max_scrolls": 6
+}

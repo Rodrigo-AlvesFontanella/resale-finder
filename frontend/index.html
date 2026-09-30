@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Resale Finder</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Resale Finder</h1>
+    <p class="subtitle">Ache itens na OLX com boa chance de revenda e avalie anúncios do Facebook Marketplace manualmente.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Buscar na OLX — Grande Porto Alegre</h2>
+      <form id="search-form">
+        <input type="text" id="query" placeholder="Ex: iphone 11, ps4, furadeira" required />
+        <select id="max-pages">
+          <option value="1">1 página OLX</option>
+          <option value="2" selected>2 páginas OLX</option>
+          <option value="3">3 páginas OLX</option>
+          <option value="5">5 páginas OLX</option>
+          <option value="8">8 páginas OLX</option>
+        </select>
+        <label class="checkbox-label">
+          <input type="checkbox" id="only-poa" checked />
+          Só Grande Porto Alegre
+        </label>
+        <button type="submit">Buscar</button>
+      </form>
+      <p class="hint">A OLX só filtra por estado (RS), não por região — por isso filtramos os 34 municípios da Região Metropolitana de Porto Alegre no próprio app. Com o filtro ligado, pode ser preciso buscar mais páginas pra achar resultados.</p>
+      <p id="search-status" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>Adicionar item manual (Facebook Marketplace, etc.)</h2>
+      <p class="hint">O Facebook bloqueia leitura automática. Cole aqui os dados do anúncio para comparar com a mesma base de preços da busca acima.</p>
+      <form id="manual-form">
+        <input type="text" id="m-title" placeholder="Título do anúncio" required />
+        <input type="number" id="m-price" placeholder="Preço (R$)" step="0.01" required />
+        <input type="text" id="m-search-term" placeholder="Categoria/termo (ex: iphone 11)" required />
+        <input type="url" id="m-url" placeholder="Link do anúncio (opcional)" />
+        <input type="text" id="m-location" placeholder="Localização (opcional)" />
+        <textarea id="m-description" placeholder="Descrição / observações do vendedor (opcional, ajuda a detectar urgência ou defeitos)"></textarea>
+        <button type="submit">Avaliar item</button>
+      </form>
+      <p id="manual-status" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>Estratégia de revenda</h2>
+      <p class="hint">Resumo automático dos itens com melhor combinação de preço, categoria de giro rápido e anúncio recente.</p>
+      <div id="strategy-summary"></div>
+    </section>
+
+    <section class="card">
+      <div class="results-header">
+        <h2>Resultados (ordenados por prioridade)</h2>
+        <select id="term-filter">
+          <option value="">Todos os termos</option>
+        </select>
+      </div>
+      <table id="results-table">
+        <thead>
+          <tr>
+            <th>Prioridade</th>
+            <th>Título</th>
+            <th>Preço</th>
+            <th>Origem</th>
+            <th>Local</th>
+            <th>Por quê</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

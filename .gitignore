@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Bancos de dados locais (recriados automaticamente nas buscas)
+*.db
+*.db.stale
+
+# Sessao do Facebook — equivale a estar logado na conta, NUNCA versionar
+facebook/fb_state.json
+facebook/config.json
