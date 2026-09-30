@@ -1,6 +1,6 @@
 import os
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -12,6 +12,11 @@ from . import models
 from .database import Base, engine, get_db
 from .scoring import compute_group_median, score_listing
 from .scraper import ScrapeError, search_olx
+
+# Chave opcional pra proteger o /api/ingest (usado pelo script de sync local).
+# Se nao estiver configurada, o endpoint fica aberto — defina SYNC_API_KEY
+# no ambiente (local e no Render) pra travar isso.
+SYNC_API_KEY = os.environ.get("SYNC_API_KEY")
 
 Base.metadata.create_all(bind=engine)
 
@@ -43,6 +48,22 @@ class ManualItem(BaseModel):
     source: str = "facebook"
 
 
+class IngestItem(BaseModel):
+    title: str
+    price: float
+    url: str
+    old_price: float | None = None
+    location: str | None = None
+    posted_at_text: str | None = None
+    description: str | None = None
+
+
+class IngestRequest(BaseModel):
+    search_term: str
+    items: list[IngestItem]
+    source: str = "olx"
+
+
 def rescore_group(db: Session, search_term: str):
     """Recalcula o score de todos os anuncios de um termo de busca, usando a
     mediana de preco do grupo inteiro (OLX + manuais) como referencia."""
@@ -68,6 +89,49 @@ def rescore_group(db: Session, search_term: str):
     return median
 
 
+def ingest_items(db: Session, search_term: str, source: str, items: list[dict]):
+    """Grava (upsert) anuncios ja obtidos (de onde for) e recalcula os scores
+    do grupo. Usado tanto pelo /api/search (scraping ao vivo) quanto pelo
+    /api/ingest (recebendo anuncios ja raspados por um script local)."""
+    for item in items:
+        existing = db.query(models.Listing).filter(models.Listing.url == item["url"]).first()
+        if existing:
+            existing.price = item["price"]
+            existing.old_price = item.get("old_price")
+            existing.location = item.get("location")
+            existing.posted_at_text = item.get("posted_at_text")
+            continue
+        db.add(
+            models.Listing(
+                source=source,
+                search_term=search_term,
+                title=item["title"],
+                price=item["price"],
+                old_price=item.get("old_price"),
+                location=item.get("location"),
+                url=item["url"],
+                posted_at_text=item.get("posted_at_text"),
+                description=item.get("description"),
+            )
+        )
+    db.commit()
+
+    rescore_group(db, search_term)
+
+    listings = (
+        db.query(models.Listing)
+        .filter(models.Listing.search_term == search_term)
+        .order_by(models.Listing.priority_score.desc())
+        .all()
+    )
+    return listings
+
+
+def check_sync_key(x_sync_key: str | None):
+    if SYNC_API_KEY and x_sync_key != SYNC_API_KEY:
+        raise HTTPException(401, "Chave de sincronizacao invalida")
+
+
 @app.post("/api/search")
 def api_search(payload: SearchRequest, db: Session = Depends(get_db)):
     query = payload.query.strip()
@@ -90,36 +154,29 @@ def api_search(payload: SearchRequest, db: Session = Depends(get_db)):
             "nas paginas buscadas. Tente aumentar o numero de paginas.",
         )
 
-    for item in items:
-        existing = db.query(models.Listing).filter(models.Listing.url == item["url"]).first()
-        if existing:
-            existing.price = item["price"]
-            existing.old_price = item["old_price"]
-            existing.location = item["location"]
-            existing.posted_at_text = item["posted_at_text"]
-            continue
-        db.add(
-            models.Listing(
-                source="olx",
-                search_term=query,
-                title=item["title"],
-                price=item["price"],
-                old_price=item["old_price"],
-                location=item["location"],
-                url=item["url"],
-                posted_at_text=item["posted_at_text"],
-            )
-        )
-    db.commit()
+    listings = ingest_items(db, query, "olx", items)
+    return {"count": len(listings), "items": [to_dict(l) for l in listings]}
 
-    rescore_group(db, query)
 
-    listings = (
-        db.query(models.Listing)
-        .filter(models.Listing.search_term == query)
-        .order_by(models.Listing.priority_score.desc())
-        .all()
-    )
+@app.post("/api/ingest")
+def api_ingest(
+    payload: IngestRequest,
+    db: Session = Depends(get_db),
+    x_sync_key: str | None = Header(default=None),
+):
+    """Recebe anuncios ja raspados por um script rodando em outra maquina
+    (ex: o sync local, que busca na OLX a partir de um IP residencial pra
+    nao ser bloqueado pela Cloudflare quando o servidor esta na nuvem)."""
+    check_sync_key(x_sync_key)
+
+    search_term = payload.search_term.strip()
+    if not search_term:
+        raise HTTPException(400, "Informe search_term")
+    if not payload.items:
+        raise HTTPException(400, "Lista de items vazia")
+
+    items = [i.model_dump() for i in payload.items]
+    listings = ingest_items(db, search_term, payload.source, items)
     return {"count": len(listings), "items": [to_dict(l) for l in listings]}
 
 

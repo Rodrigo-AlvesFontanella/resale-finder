@@ -1,0 +1,26 @@
+{
+  "api_base_url": "https://resale-finder-xxxx.onrender.com",
+  "sync_api_key": "coloque-aqui-a-mesma-chave-que-voce-configurou-no-render (SYNC_API_KEY)",
+  "only_poa_metro": true,
+  "max_pages_per_term": 3,
+  "delay_between_terms_seconds": 4,
+  "search_terms": [
+    "iphone 11",
+    "iphone 12",
+    "iphone 13",
+    "galaxy s21",
+    "galaxy s22",
+    "ps4",
+    "ps5",
+    "xbox one",
+    "nintendo switch",
+    "notebook",
+    "macbook",
+    "furadeira",
+    "parafusadeira",
+    "smart tv",
+    "bicicleta",
+    "tenis nike",
+    "airpods"
+  ]
+}

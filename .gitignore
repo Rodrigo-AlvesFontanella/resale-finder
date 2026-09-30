@@ -10,3 +10,6 @@ venv/
 # Sessao do Facebook — equivale a estar logado na conta, NUNCA versionar
 facebook/fb_state.json
 facebook/config.json
+
+# Config do sync tem a chave da API e a URL do seu servidor
+sync/config.json

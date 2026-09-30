@@ -1,11 +1,27 @@
 # Resale Finder
 
-App web que busca anúncios na OLX (filtrado pra Região Metropolitana de
-Porto Alegre), calcula um **score de prioridade de revenda** por item, e
-deixa adicionar manualmente itens do Facebook Marketplace (ou automatizar
-isso com o script local em `facebook/`) pra entrarem na mesma comparação.
+Site que mostra anúncios da OLX e do Facebook Marketplace na Grande Porto
+Alegre, ordenados por um **score de prioridade de revenda** — o que comprar
+primeiro pra ter mais chance de vender rápido e com lucro.
 
-## Como rodar localmente
+## Como está organizado
+
+A OLX (Cloudflare) bloqueia requisições vindas de IPs de servidor/nuvem, só
+funciona a partir de um IP residencial normal. Por isso o app é dividido em
+duas partes:
+
+- **Site hospedado** (`backend/` + `frontend/`): mostra os anúncios já
+  salvos, ordenados por prioridade, com link direto pra cada um. É só pra
+  conferir e clicar — rodando na nuvem, o botão "Buscar" não funciona
+  sozinho (dá erro 403 da OLX).
+- **`sync/sync_olx.py`**: roda no **seu computador** (usa seu IP de casa,
+  que funciona), busca uma lista de termos com boa liquidez de revenda,
+  filtra pra Grande Porto Alegre, e envia os anúncios pro site hospedado.
+  Agende pra rodar sozinho de tempos em tempos (veja abaixo).
+- **`facebook/`**: mesma ideia, mas pro Facebook Marketplace, com login de
+  verdade (veja a seção própria — tem risco de conta que vale ler antes).
+
+## Como rodar o site localmente (dev)
 
 ```
 cd resale-finder
@@ -13,14 +29,15 @@ python -m pip install -r requirements.txt
 python -m uvicorn backend.main:app --port 8000 --reload
 ```
 
-Abra http://127.0.0.1:8000 no navegador.
+Abra http://127.0.0.1:8000 no navegador. Localmente o botão "Buscar" funciona
+direto (seu IP de casa não é bloqueado).
 
 ## Como funciona o score de prioridade
 
-1. Você busca um termo (ex: "iphone 11") — o app raspa a OLX no estado do RS
-   e filtra só os 34 municípios da Região Metropolitana de Porto Alegre
-   (a OLX só filtra por estado via URL, então esse recorte é feito no app).
-2. Calcula a mediana de preço entre os anúncios daquele termo.
+1. Cada termo buscado (ex: "iphone 11") vira um grupo de anúncios filtrados
+   pra Região Metropolitana de Porto Alegre (34 municípios, comparados no
+   próprio app — a OLX só filtra por estado via URL).
+2. Calcula a mediana de preço entre os anúncios daquele grupo.
 3. **Score de preço**: quanto mais abaixo da mediana, maior o score (0–100).
 4. **Bônus de urgência**: palavras como "urgente", "aceito proposta",
    "mudança" somam pontos — indicam vendedor disposto a negociar rápido.
@@ -31,12 +48,63 @@ Abra http://127.0.0.1:8000 no navegador.
    ferramentas elétricas etc. vendem mais rápido que móveis/eletrodomésticos
    grandes) e um bônus de **anúncio recente** (publicado hoje/ontem = menos
    concorrência pra você chegar primeiro na negociação).
-7. Itens manuais (Facebook, etc.) usam a mesma mediana do termo de busca
-   informado, então entram na mesma régua de comparação.
+7. Itens manuais ou do sync (Facebook, etc.) usam a mesma mediana do termo
+   de busca informado, então entram na mesma régua de comparação.
 
-O bloco "Estratégia de revenda" na página mostra o top 5 com a razão de
-cada um (ex: *"preço 44% abaixo da mediana; categoria de giro rápido
-(iphone); anunciado ontem"*) — comece negociando por esses.
+O bloco "Estratégia de revenda" no topo da página mostra o top 5 com a razão
+de cada um (ex: *"preço 44% abaixo da mediana; categoria de giro rápido
+(iphone); anunciado ontem"*) — comece chamando esses.
+
+## Hospedar no Render (grátis)
+
+O plano gratuito do Render **dorme após alguns minutos sem acesso** (demora
+~30s pra acordar no próximo acesso) e **não tem disco persistente** — o
+banco (`resale.db`) é recriado do zero a cada deploy/restart. Como os dados
+vêm do sync (re-obteníveis a qualquer momento), isso é aceitável.
+
+1. Suba este repositório pro GitHub (veja seção abaixo).
+2. Crie uma conta em https://render.com e conecte com o GitHub.
+3. "New" → "Blueprint" → selecione o repositório → o Render lê o
+   `render.yaml` e configura tudo sozinho (já fixado em Python 3.12, o
+   3.14 default do Render quebra o build do `pydantic-core`).
+4. **Defina a variável de ambiente `SYNC_API_KEY`** no serviço criado
+   (Render → seu serviço → Environment → Add Environment Variable) com uma
+   senha longa qualquer — ela protege o `/api/ingest` pra só o seu script
+   de sync poder gravar dados no site. Sem isso, qualquer pessoa na internet
+   poderia mandar lixo pro seu banco.
+5. Aguarde o build — o site fica em algo como
+   `https://resale-finder-XXXX.onrender.com`.
+
+## Sincronizar a OLX (rodando no seu PC)
+
+**Setup (uma vez):**
+
+```
+cd resale-finder
+cp sync/config.example.json sync/config.json
+```
+
+Edite `sync/config.json`:
+- `api_base_url`: a URL do seu site no Render
+- `sync_api_key`: a mesma senha que você colocou em `SYNC_API_KEY` no Render
+- `search_terms`: ajuste a lista de categorias como quiser
+
+**Rodar manualmente:**
+
+```
+python sync/sync_olx.py
+```
+
+**Agendar no Windows** (roda sozinho, por exemplo a cada 4 horas — não
+agende com intervalo curto demais, é mais fácil a OLX perceber padrão de
+robô):
+
+```
+schtasks /create /tn "ResaleFinderSync" /tr "python C:\caminho\completo\resale-finder\sync\sync_olx.py" /sc hourly /mo 4
+```
+
+(Ajuste o caminho pro local real da pasta no seu PC. Pra remover depois:
+`schtasks /delete /tn "ResaleFinderSync" /f`.)
 
 ## Facebook Marketplace (automação local — leia o risco antes)
 
@@ -64,7 +132,8 @@ define a localização "Porto Alegre" no filtro do Marketplace, faz uma busca
 de teste, e copia a URL resultante da barra de endereços.
 
 Depois copie `config.example.json` para `config.json` e cole essa URL em
-`search_url_template`, trocando o termo de busca por `{query}`.
+`search_url_template`, trocando o termo de busca por `{query}`. Coloque
+também a URL do site hospedado em `api_base_url`.
 
 **Uso (sempre que quiser buscar):**
 
@@ -73,9 +142,8 @@ python scrape.py "iphone 11"
 ```
 
 Ele abre o Marketplace já logado, busca o termo, e manda os anúncios
-encontrados pro `api_base_url` configurado (local ou o site já hospedado)
-via a mesma rota que o formulário manual usa — eles aparecem no site
-misturados com os da OLX, com o mesmo score.
+encontrados pro site hospedado via a mesma rota que o formulário manual
+usa — eles aparecem misturados com os da OLX, com o mesmo score.
 
 > **Isso não foi testado ao vivo** (não tenho como logar numa conta real do
 > Facebook por aqui). O Facebook ofusca nomes de classe CSS e muda o layout
@@ -84,42 +152,28 @@ misturados com os da OLX, com o mesmo score.
 > o que aconteceu (funcionou / não achou nada / erro) que a gente ajusta
 > junto.
 
-## Hospedar no Render (grátis)
-
-O plano gratuito do Render **dorme após alguns minutos sem acesso** (demora
-~30s pra acordar no próximo acesso) e **não tem disco persistente** — o
-banco (`resale.db`) é recriado do zero a cada deploy/restart. Como os dados
-são só o resultado de buscas (re-obteníveis), isso é aceitável pra começar.
-
-1. Suba este repositório pro GitHub (veja seção abaixo).
-2. Crie uma conta em https://render.com e conecte com o GitHub.
-3. "New" → "Blueprint" → selecione o repositório → o Render lê o
-   `render.yaml` daqui e configura tudo sozinho.
-4. Aguarde o build (alguns minutos) — o site fica em algo como
-   `https://resale-finder-XXXX.onrender.com`.
-
 ## Subir pro GitHub
 
 ```
 cd resale-finder
-git init
 git add .
-git commit -m "Resale finder: busca OLX POA + score de prioridade"
-git branch -M main
-git remote add origin https://github.com/SEU_USUARIO/resale-finder.git
-git push -u origin main
+git commit -m "sua mensagem"
+git push
 ```
 
-(Crie o repositório vazio antes em https://github.com/new — sem README/gitignore,
-pra não conflitar com o que já existe aqui.)
+(Já está tudo configurado — o repositório é
+https://github.com/Rodrigo-AlvesFontanella/resale-finder.)
 
 ## Limitações conhecidas
 
 - A OLX usa Cloudflare; usamos `curl_cffi` (imita TLS de navegador) pra não
-  ser bloqueado — se parar de funcionar, o erro retornado indica isso
-  (`backend/scraper.py`).
+  ser bloqueado por fingerprint — mas IPs de datacenter (Render, AWS etc.)
+  ainda tomam 403 por reputação de IP, por isso o sync roda local.
 - O filtro de Grande Porto Alegre é feito comparando o texto de localização
   de cada anúncio com a lista de municípios da RMPA (`scoring.py`); cidades
   fora dessa lista nunca aparecem mesmo que estejam próximas.
-- Os sinais de urgência/risco são por palavra-chave — não pega tudo, é uma
-  ajuda, não uma garantia.
+- Os sinais de urgência/risco/categoria são por palavra-chave — não pega
+  tudo, é uma ajuda, não uma garantia.
+- `/api/ingest` sem `SYNC_API_KEY` configurada fica aberto pra qualquer um
+  gravar dados — defina a variável de ambiente antes de divulgar a URL do
+  site.
