@@ -123,12 +123,39 @@ async function loadTerms() {
   termFilter.value = current;
 }
 
+const toggleAllBtn = document.getElementById("toggle-all");
+const resultsCount = document.getElementById("results-count");
+let showAll = false;
+
 async function loadListings(searchTerm) {
-  const url = searchTerm ? `/api/listings?search_term=${encodeURIComponent(searchTerm)}` : "/api/listings";
-  const res = await fetch(url);
+  const params = new URLSearchParams();
+  if (searchTerm) params.set("search_term", searchTerm);
+  params.set("limit", showAll ? "0" : "50");
+  const res = await fetch(`/api/listings?${params}`);
   const data = await res.json();
   renderItems(data.items);
   renderStrategy(data.items);
+  resultsCount.textContent = data.total > data.count
+    ? `Mostrando ${data.count} de ${data.total} anúncios (os de maior prioridade).`
+    : `${data.total} anúncios.`;
+  toggleAllBtn.textContent = showAll ? "Mostrar só os 50 melhores" : "Mostrar todos";
+}
+
+toggleAllBtn.addEventListener("click", () => {
+  showAll = !showAll;
+  loadListings(termFilter.value);
+});
+
+async function applyConfig() {
+  try {
+    const res = await fetch("/api/config");
+    const cfg = await res.json();
+    if (!cfg.live_search) {
+      document.getElementById("search-section").hidden = true;
+    }
+  } catch (_) {
+    // sem config, mantem o formulario visivel
+  }
 }
 
 searchForm.addEventListener("submit", async (e) => {
@@ -191,5 +218,6 @@ manualForm.addEventListener("submit", async (e) => {
 
 termFilter.addEventListener("change", () => loadListings(termFilter.value));
 
+applyConfig();
 loadTerms();
 loadListings("");

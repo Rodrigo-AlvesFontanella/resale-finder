@@ -18,6 +18,11 @@ from .scraper import ScrapeError, search_olx
 # no ambiente (local e no Render) pra travar isso.
 SYNC_API_KEY = os.environ.get("SYNC_API_KEY")
 
+# Na versao hospedada a OLX bloqueia o IP do servidor, entao a busca direta
+# fica desligada la (ALLOW_LIVE_SEARCH=false no render.yaml) e os dados vem
+# do sync local.
+LIVE_SEARCH = os.environ.get("ALLOW_LIVE_SEARCH", "true").lower() == "true"
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Resale Finder")
@@ -132,8 +137,16 @@ def check_sync_key(x_sync_key: str | None):
         raise HTTPException(401, "Chave de sincronizacao invalida")
 
 
+@app.get("/api/config")
+def api_config():
+    return {"live_search": LIVE_SEARCH}
+
+
 @app.post("/api/search")
 def api_search(payload: SearchRequest, db: Session = Depends(get_db)):
+    if not LIVE_SEARCH:
+        raise HTTPException(403, "Busca direta desativada nesta versao. Os dados vem do sync local.")
+
     query = payload.query.strip()
     if not query:
         raise HTTPException(400, "Informe um termo de busca")
@@ -181,12 +194,20 @@ def api_ingest(
 
 
 @app.get("/api/listings")
-def api_listings(search_term: str | None = None, db: Session = Depends(get_db)):
+def api_listings(
+    search_term: str | None = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
     q = db.query(models.Listing)
     if search_term:
         q = q.filter(models.Listing.search_term == search_term)
-    listings = q.order_by(models.Listing.priority_score.desc()).all()
-    return {"count": len(listings), "items": [to_dict(l) for l in listings]}
+    total = q.count()
+    q = q.order_by(models.Listing.priority_score.desc())
+    if limit > 0:
+        q = q.limit(limit)
+    listings = q.all()
+    return {"total": total, "count": len(listings), "items": [to_dict(l) for l in listings]}
 
 
 @app.get("/api/search-terms")

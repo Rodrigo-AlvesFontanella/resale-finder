@@ -158,6 +158,18 @@ a { color: var(--accent); }
   margin-top: 4px;
 }
 
+.results-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.secondary-btn {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
 .strategy-empty {
   color: var(--muted);
   font-size: 14px;

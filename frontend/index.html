@@ -22,10 +22,14 @@
     <section class="card">
       <div class="results-header">
         <h2>Resultados (ordenados por prioridade)</h2>
-        <select id="term-filter">
-          <option value="">Todos os termos</option>
-        </select>
+        <div class="results-controls">
+          <select id="term-filter">
+            <option value="">Todos os termos</option>
+          </select>
+          <button type="button" id="toggle-all" class="secondary-btn">Mostrar todos</button>
+        </div>
       </div>
+      <p id="results-count" class="hint"></p>
       <table id="results-table">
         <thead>
           <tr>
@@ -42,7 +46,7 @@
       </table>
     </section>
 
-    <section class="card">
+    <section class="card" id="search-section">
       <h2>Buscar na OLX — Grande Porto Alegre</h2>
       <form id="search-form">
         <input type="text" id="query" placeholder="Ex: iphone 11, ps4, furadeira" required />
