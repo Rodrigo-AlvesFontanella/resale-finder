@@ -7,84 +7,143 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <header>
-    <h1>Resale Finder</h1>
-    <p class="subtitle">Itens da OLX e do Facebook Marketplace na Grande Porto Alegre, priorizados por chance de revenda rápida e lucrativa.</p>
+  <header class="topbar">
+    <div>
+      <h1>Resale Finder</h1>
+      <p class="subtitle">Grande Porto Alegre: revenda de OLX e promoções de farmácia, priorizadas.</p>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button type="button" class="tab active" data-section="revenda" role="tab">Revenda (OLX)</button>
+      <button type="button" class="tab" data-section="farmacia" role="tab">Farmácia</button>
+    </nav>
   </header>
 
   <main>
-    <section class="card">
-      <div class="results-header">
-        <h2>Estratégia de revenda</h2>
-        <button type="button" id="sync-btn" class="secondary-btn">Sincronizar agora</button>
+    <section class="card sync-card">
+      <div class="row-between">
+        <div>
+          <h2>Atualização dos dados</h2>
+          <p id="sync-status" class="status"></p>
+        </div>
+        <button type="button" id="sync-btn" class="btn">Sincronizar agora</button>
       </div>
-      <p class="hint">Resumo automático dos itens com melhor combinação de preço, categoria de giro rápido e anúncio recente. Os dados vêm de um sync rodando no seu PC.</p>
-      <p id="sync-status" class="status"></p>
-      <div id="strategy-summary"></div>
     </section>
 
     <section class="card">
-      <div class="results-header">
-        <h2>Resultados (ordenados por prioridade)</h2>
-        <div class="results-controls">
-          <select id="term-filter" autocomplete="off">
-            <option value="">Todos os termos</option>
-          </select>
-          <button type="button" id="toggle-all" class="secondary-btn">Mostrar todos</button>
+      <h2 id="strategy-title">Melhores oportunidades</h2>
+      <p class="hint" id="strategy-hint"></p>
+      <div id="strategy-summary" class="strategy-list"></div>
+    </section>
+
+    <section class="card">
+      <div class="row-between wrap">
+        <h2>Anúncios</h2>
+        <div class="controls">
+          <select id="term-filter" autocomplete="off" aria-label="Filtrar por termo"></select>
+          <label class="check"><input type="checkbox" id="show-hidden" /> Mostrar ocultos</label>
+          <button type="button" id="toggle-all" class="btn ghost">Mostrar todos</button>
         </div>
       </div>
       <p id="results-count" class="hint"></p>
-      <table id="results-table">
-        <thead>
-          <tr>
-            <th>Prioridade</th>
-            <th>Título</th>
-            <th>Preço</th>
-            <th>Origem</th>
-            <th>Local</th>
-            <th>Por quê</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="results-body"></tbody>
-      </table>
+      <div class="table-wrap">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th>Prioridade</th>
+              <th>Item</th>
+              <th>Preço</th>
+              <th>Validade</th>
+              <th>Onde</th>
+              <th>Por quê</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
     </section>
 
-    <section class="card" id="search-section">
+    <section class="card" id="pharmacy-tools" hidden>
+      <h2>Colar promoção (WhatsApp ou site)</h2>
+      <p class="hint">Cole o texto da promoção. O app tenta achar preço, preço antigo e validade; você confere antes de salvar.</p>
+      <textarea id="paste-text" rows="4" placeholder="Ex: Fralda Pampers G 56un - de R$ 89,90 por R$ 59,90 - validade 03/2027"></textarea>
+      <div class="row-between wrap">
+        <button type="button" id="parse-btn" class="btn">Preencher formulário</button>
+        <span id="parse-status" class="status"></span>
+      </div>
+    </section>
+
+    <section class="card" id="pharmacy-links" hidden>
+      <h2>Conferir nas farmácias</h2>
+      <p class="hint">Abre a busca direto no site de cada farmácia pra você checar as promoções.</p>
+      <div class="row-between wrap">
+        <input type="text" id="quick-term" placeholder="Ex: fralda G, dipirona 500mg" />
+        <div class="chips">
+          <a class="chip" data-store="panvel" target="_blank" rel="noopener">Panvel</a>
+          <a class="chip" data-store="paguemenos" target="_blank" rel="noopener">Pague Menos</a>
+          <a class="chip" data-store="pacheco" target="_blank" rel="noopener">Pacheco</a>
+          <a class="chip" data-store="raia" target="_blank" rel="noopener">Raia/Drogasil</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="search-section" hidden>
       <h2>Buscar na OLX — Grande Porto Alegre</h2>
-      <form id="search-form">
+      <form id="search-form" class="form-inline">
         <input type="text" id="query" placeholder="Ex: iphone 11, ps4, furadeira" required />
-        <select id="max-pages">
-          <option value="1">1 página OLX</option>
-          <option value="2" selected>2 páginas OLX</option>
-          <option value="3">3 páginas OLX</option>
-          <option value="5">5 páginas OLX</option>
-          <option value="8">8 páginas OLX</option>
+        <select id="max-pages" aria-label="Páginas da OLX">
+          <option value="1">1 página</option>
+          <option value="2" selected>2 páginas</option>
+          <option value="3">3 páginas</option>
+          <option value="5">5 páginas</option>
+          <option value="8">8 páginas</option>
         </select>
-        <label class="checkbox-label">
-          <input type="checkbox" id="only-poa" checked />
-          Só Grande Porto Alegre
-        </label>
-        <button type="submit">Buscar</button>
+        <label class="check"><input type="checkbox" id="only-poa" checked /> Só Grande Porto Alegre</label>
+        <button type="submit" class="btn">Buscar</button>
       </form>
-      <p class="hint">A OLX só filtra por estado (RS), não por região — por isso filtramos os 34 municípios da Região Metropolitana de Porto Alegre no próprio app. Com o filtro ligado, pode ser preciso buscar mais páginas pra achar resultados.</p>
-      <p class="hint">Na versão hospedada, a OLX bloqueia buscas vindas do servidor (IP de nuvem) — por isso os resultados abaixo vêm do <code>sync/sync_olx.py</code> rodando agendado no seu PC, não desse botão. Rodando localmente (<code>uvicorn</code> na sua máquina), o botão funciona normalmente.</p>
+      <p class="hint">Na versão hospedada a OLX bloqueia buscas vindas do servidor, então os dados vêm do sync no seu PC. Rodando localmente, o botão funciona direto.</p>
       <p id="search-status" class="status"></p>
     </section>
 
     <section class="card">
-      <h2>Adicionar item manual (Facebook Marketplace, etc.)</h2>
-      <p class="hint">O Facebook bloqueia leitura automática. Cole aqui os dados do anúncio para comparar com a mesma base de preços da busca acima.</p>
-      <form id="manual-form">
-        <input type="text" id="m-title" placeholder="Título do anúncio" required />
-        <input type="number" id="m-price" placeholder="Preço (R$)" step="0.01" required />
-        <input type="text" id="m-search-term" placeholder="Categoria/termo (ex: iphone 11)" required />
-        <input type="url" id="m-url" placeholder="Link do anúncio (opcional)" />
-        <input type="text" id="m-location" placeholder="Localização (opcional)" />
-        <textarea id="m-description" placeholder="Descrição / observações do vendedor (opcional, ajuda a detectar urgência ou defeitos)"></textarea>
-        <button type="submit">Avaliar item</button>
+      <h2>Adicionar ou editar item</h2>
+      <p class="hint">Use pra Facebook Marketplace, promoções de farmácia ou qualquer item que você queira comparar.</p>
+      <form id="manual-form" class="form-grid">
+        <label>Seção
+          <select id="m-section">
+            <option value="revenda">Revenda</option>
+            <option value="farmacia">Farmácia</option>
+          </select>
+        </label>
+        <label>Título
+          <input type="text" id="m-title" required />
+        </label>
+        <label>Preço (R$)
+          <input type="number" id="m-price" step="0.01" min="0" required />
+        </label>
+        <label>Preço normal (R$, opcional)
+          <input type="number" id="m-old-price" step="0.01" min="0" />
+        </label>
+        <label>Validade (MM/AAAA)
+          <input type="text" id="m-expires" placeholder="03/2027" pattern="\d{1,2}/\d{4}" />
+        </label>
+        <label>Termo / categoria
+          <input type="text" id="m-search-term" placeholder="Ex: fralda g, iphone 11" required />
+        </label>
+        <label>Link (opcional)
+          <input type="url" id="m-url" />
+        </label>
+        <label>Onde (loja ou local, opcional)
+          <input type="text" id="m-location" />
+        </label>
+        <label class="span-2">Observações
+          <textarea id="m-description" rows="2"></textarea>
+        </label>
+        <div class="span-2 row-between">
+          <button type="submit" class="btn">Salvar</button>
+          <span id="manual-status" class="status"></span>
+        </div>
       </form>
-      <p id="manual-status" class="status"></p>
     </section>
   </main>
 

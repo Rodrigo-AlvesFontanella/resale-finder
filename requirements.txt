@@ -4,3 +4,4 @@ sqlalchemy==2.0.35
 curl_cffi==0.7.4
 beautifulsoup4==4.12.3
 pydantic==2.9.2
+psycopg[binary]==3.2.3

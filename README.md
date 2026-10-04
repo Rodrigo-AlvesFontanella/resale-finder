@@ -75,6 +75,30 @@ vêm do sync (re-obteníveis a qualquer momento), isso é aceitável.
 5. Aguarde o build — o site fica em algo como
    `https://resale-finder-XXXX.onrender.com`.
 
+## Seção de farmácia
+
+Na aba **Farmácia** você acompanha promoções de fraldas e remédios:
+
+- **Colar promoção:** cole o texto de um grupo de WhatsApp ou de um site.
+  O app tenta achar produto, preço, preço normal e validade; você confere e salva.
+- **Validade:** itens que vencem em até 6 meses aparecem com aviso; vencidos
+  ficam com prioridade zero e fora dos destaques.
+- **Histórico de preço:** cada mudança de preço fica registrada, com selo
+  "↓ caiu de R$ X" e o menor preço já visto.
+- **Conferir nas farmácias:** links de busca direto nos sites de Panvel,
+  Pague Menos, Pacheco e Raia/Drogasil.
+- **Ocultar:** esconde o que você já comprou ou descartou (aparece de novo
+  se marcar "Mostrar ocultos").
+
+Essa seção não raspa as farmácias: os sites exigem CEP e bloqueiam
+acesso automatizado, então os dados entram por você.
+
+**Banco persistente (recomendado):** no plano gratuito do Render o banco
+local é apagado a cada reinício. Pra não perder promoções e histórico, crie
+um Postgres gratuito (ex: Neon) e defina a variável `DATABASE_URL` no
+serviço do Render com a connection string. Ela contém senha: guarde só no
+Render, nunca no repositório.
+
 ## Sincronizar a OLX (rodando no seu PC)
 
 **Setup (uma vez):**
