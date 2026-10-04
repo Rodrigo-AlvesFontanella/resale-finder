@@ -100,7 +100,7 @@ function renderItems(items) {
     delBtn.title = "Remover";
     delBtn.onclick = async () => {
       await fetch(`/api/listings/${item.id}`, { method: "DELETE" });
-      loadListings(termFilter.value);
+      loadListings(selectedTerm);
     };
     actionsTd.appendChild(delBtn);
     tr.appendChild(actionsTd);
@@ -109,10 +109,11 @@ function renderItems(items) {
   }
 }
 
+let selectedTerm = "";
+
 async function loadTerms() {
   const res = await fetch("/api/search-terms");
   const data = await res.json();
-  const current = termFilter.value;
   termFilter.innerHTML = '<option value="">Todos os termos</option>';
   for (const t of data.terms) {
     const opt = document.createElement("option");
@@ -120,7 +121,7 @@ async function loadTerms() {
     opt.textContent = `${t.term} (${t.count})`;
     termFilter.appendChild(opt);
   }
-  termFilter.value = current;
+  termFilter.value = selectedTerm;
 }
 
 const toggleAllBtn = document.getElementById("toggle-all");
@@ -143,7 +144,7 @@ async function loadListings(searchTerm) {
 
 toggleAllBtn.addEventListener("click", () => {
   showAll = !showAll;
-  loadListings(termFilter.value);
+  loadListings(selectedTerm);
 });
 
 async function applyConfig() {
@@ -177,7 +178,7 @@ searchForm.addEventListener("submit", async (e) => {
     const data = await res.json();
     searchStatus.textContent = `${data.count} anúncios encontrados/atualizados para "${query}"${onlyPoa ? " na Grande Porto Alegre" : ""}.`;
     await loadTerms();
-    termFilter.value = query;
+    selectedTerm = query;
     await loadListings(query);
   } catch (err) {
     searchStatus.textContent = `Erro: ${err.message}`;
@@ -209,14 +210,17 @@ manualForm.addEventListener("submit", async (e) => {
     manualStatus.textContent = `Item avaliado: ${item.label} (prioridade ${item.priority_score})`;
     manualForm.reset();
     await loadTerms();
-    termFilter.value = payload.search_term;
+    selectedTerm = payload.search_term;
     await loadListings(payload.search_term);
   } catch (err) {
     manualStatus.textContent = `Erro: ${err.message}`;
   }
 });
 
-termFilter.addEventListener("change", () => loadListings(termFilter.value));
+termFilter.addEventListener("change", () => {
+  selectedTerm = termFilter.value;
+  loadListings(selectedTerm);
+});
 
 applyConfig();
 loadTerms();
