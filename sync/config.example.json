@@ -4,6 +4,8 @@
   "only_poa_metro": true,
   "max_pages_per_term": 3,
   "delay_between_terms_seconds": 4,
+  "poll_seconds": 120,
+  "interval_hours": 4,
   "search_terms": [
     "iphone 11",
     "iphone 12",

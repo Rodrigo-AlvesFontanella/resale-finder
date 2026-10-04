@@ -222,6 +222,65 @@ termFilter.addEventListener("change", () => {
   loadListings(selectedTerm);
 });
 
+const syncBtn = document.getElementById("sync-btn");
+const syncStatus = document.getElementById("sync-status");
+let lastPending = false;
+
+function timeAgo(iso) {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) return "agora há pouco";
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `há ${hours} h`;
+  return `há ${Math.round(hours / 24)} dias`;
+}
+
+function renderSyncStatus(s) {
+  if (s.pending) {
+    syncStatus.textContent = "Pedido enviado. Aguardando o sync rodar no seu PC (leva uns 5 minutos).";
+  } else if (s.last_sync_at) {
+    syncStatus.textContent = `Última sincronização: ${timeAgo(s.last_sync_at)}.`;
+  } else {
+    syncStatus.textContent = "Nenhuma sincronização ainda.";
+  }
+  syncBtn.disabled = s.pending;
+}
+
+async function loadSyncStatus() {
+  try {
+    const res = await fetch("/api/sync-status");
+    const s = await res.json();
+    renderSyncStatus(s);
+    if (lastPending && !s.pending) {
+      await loadTerms();
+      await loadListings(selectedTerm);
+    }
+    lastPending = s.pending;
+  } catch (_) {
+    syncStatus.textContent = "Não consegui falar com o servidor agora.";
+  }
+}
+
+syncBtn.addEventListener("click", async () => {
+  syncBtn.disabled = true;
+  try {
+    const res = await fetch("/api/sync-request", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) {
+      syncStatus.textContent = data.detail || "Não foi possível pedir o sync.";
+      syncBtn.disabled = false;
+      return;
+    }
+    lastPending = data.pending;
+    renderSyncStatus(data);
+  } catch (_) {
+    syncStatus.textContent = "Erro ao enviar o pedido.";
+    syncBtn.disabled = false;
+  }
+});
+
 applyConfig();
 loadTerms();
 loadListings("");
+loadSyncStatus();
+setInterval(loadSyncStatus, 20000);

@@ -14,8 +14,12 @@
 
   <main>
     <section class="card">
-      <h2>Estratégia de revenda</h2>
-      <p class="hint">Resumo automático dos itens com melhor combinação de preço, categoria de giro rápido e anúncio recente. Atualizado pelo sync automático rodando no seu PC.</p>
+      <div class="results-header">
+        <h2>Estratégia de revenda</h2>
+        <button type="button" id="sync-btn" class="secondary-btn">Sincronizar agora</button>
+      </div>
+      <p class="hint">Resumo automático dos itens com melhor combinação de preço, categoria de giro rápido e anúncio recente. Os dados vêm de um sync rodando no seu PC.</p>
+      <p id="sync-status" class="status"></p>
       <div id="strategy-summary"></div>
     </section>
 

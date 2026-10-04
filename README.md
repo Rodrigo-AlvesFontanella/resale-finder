@@ -95,16 +95,32 @@ Edite `sync/config.json`:
 python sync/sync_olx.py
 ```
 
-**Agendar no Windows** (roda sozinho, por exemplo a cada 4 horas — não
-agende com intervalo curto demais, é mais fácil a OLX perceber padrão de
-robô):
+**Modo automático (recomendado):** deixe o watcher rodando no seu PC:
 
 ```
-schtasks /create /tn "ResaleFinderSync" /tr "python C:\caminho\completo\resale-finder\sync\sync_olx.py" /sc hourly /mo 4
+python sync/sync_watch.py
 ```
 
-(Ajuste o caminho pro local real da pasta no seu PC. Pra remover depois:
-`schtasks /delete /tn "ResaleFinderSync" /f`.)
+Ele checa o site a cada 2 minutos e sincroniza quando:
+- alguém aperta **"Sincronizar agora"** no site, ou
+- o último sync passou de 4 horas (configurável em `interval_hours`).
+
+O botão tem limite de uma sincronização a cada 30 minutos, pra não expor
+seu IP a bloqueio da OLX. O watcher precisa estar rodando no PC pra
+qualquer sync acontecer.
+
+Pra ele iniciar sozinho quando o Windows ligar, crie uma tarefa:
+
+```
+schtasks /create /tn "ResaleFinderWatch" /tr "pythonw C:\caminho\completo\resale-finder\sync\sync_watch.py" /sc onlogon
+```
+
+(Ajuste o caminho. Pra remover: `schtasks /delete /tn "ResaleFinderWatch" /f`.)
+
+Obs.: o watcher faz uma requisição a cada 2 minutos, o que mantém o site do
+Render acordado — o banco não é apagado por inatividade enquanto ele roda.
+Confira as horas do plano gratuito (750 h/mês) porque 24h por dia consome
+quase todo o mês.
 
 ## Facebook Marketplace (automação local — leia o risco antes)
 

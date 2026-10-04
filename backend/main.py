@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -135,6 +136,69 @@ def ingest_items(db: Session, search_term: str, source: str, items: list[dict]):
 def check_sync_key(x_sync_key: str | None):
     if SYNC_API_KEY and x_sync_key != SYNC_API_KEY:
         raise HTTPException(401, "Chave de sincronizacao invalida")
+
+
+SYNC_COOLDOWN = timedelta(minutes=30)
+
+
+def get_sync_state(db: Session, key: str) -> datetime | None:
+    row = db.query(models.SyncState).filter(models.SyncState.key == key).first()
+    return datetime.fromisoformat(row.value) if row and row.value else None
+
+
+def set_sync_state(db: Session, key: str, value: str):
+    row = db.query(models.SyncState).filter(models.SyncState.key == key).first()
+    if row:
+        row.value = value
+    else:
+        db.add(models.SyncState(key=key, value=value))
+    db.commit()
+
+
+def sync_status(db: Session) -> dict:
+    requested = get_sync_state(db, "requested_at")
+    last = get_sync_state(db, "last_sync_at")
+    pending = requested is not None and (last is None or requested > last)
+    return {
+        "pending": pending,
+        "requested_at": requested.isoformat() if requested else None,
+        "last_sync_at": last.isoformat() if last else None,
+    }
+
+
+@app.get("/api/sync-status")
+def api_sync_status(db: Session = Depends(get_db)):
+    return sync_status(db)
+
+
+@app.post("/api/sync-request")
+def api_sync_request(db: Session = Depends(get_db)):
+    """Pede pro script local (sync/sync_watch.py) rodar um sync. Tem limite de
+    uma sincronizacao a cada 30 min pra nao expor o IP do seu PC a bloqueio
+    da OLX."""
+    status = sync_status(db)
+    if status["pending"]:
+        return status
+
+    last = get_sync_state(db, "last_sync_at")
+    if last:
+        wait = SYNC_COOLDOWN - (datetime.now(timezone.utc) - last)
+        if wait > timedelta(0):
+            minutes = int(wait.total_seconds() // 60) + 1
+            raise HTTPException(429, f"Ultima sincronizacao ha pouco. Tente de novo em ~{minutes} min.")
+
+    set_sync_state(db, "requested_at", datetime.now(timezone.utc).isoformat())
+    return sync_status(db)
+
+
+@app.post("/api/sync-done")
+def api_sync_done(
+    db: Session = Depends(get_db),
+    x_sync_key: str | None = Header(default=None),
+):
+    check_sync_key(x_sync_key)
+    set_sync_state(db, "last_sync_at", datetime.now(timezone.utc).isoformat())
+    return sync_status(db)
 
 
 @app.get("/api/config")

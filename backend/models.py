@@ -26,3 +26,10 @@ class Listing(Base):
     priority_reasons = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SyncState(Base):
+    __tablename__ = "sync_state"
+
+    key = Column(String, primary_key=True)
+    value = Column(Text, nullable=True)
