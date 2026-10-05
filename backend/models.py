@@ -19,7 +19,8 @@ class Listing(Base):
     location = Column(String, nullable=True)
     url = Column(String, unique=True)
     posted_at_text = Column(String, nullable=True)
-    expires_at = Column(String, nullable=True)  # MM/AAAA
+    expires_at = Column(String, nullable=True)  # validade do produto, MM/AAAA
+    promo_ends_at = Column(String, nullable=True)  # fim da promocao, ISO em UTC
     hidden = Column(Boolean, default=False)
     description = Column(Text, nullable=True)
 

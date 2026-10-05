@@ -35,6 +35,17 @@
       <div id="strategy-summary" class="strategy-list"></div>
     </section>
 
+    <section class="card" id="cart-card" hidden>
+      <div class="row-between wrap">
+        <h2>Minha compra</h2>
+        <button type="button" id="cart-clear" class="btn ghost small">Limpar lista</button>
+      </div>
+      <p class="hint">Itens que você marcou com "+ compra". O total usa o preço atual de cada um.</p>
+      <div id="cart-lines" class="captures"></div>
+      <div id="cart-totals" class="cart-totals"></div>
+      <p id="cart-warnings" class="status"></p>
+    </section>
+
     <section class="card">
       <div class="row-between wrap">
         <h2>Anúncios</h2>
@@ -64,13 +75,22 @@
     </section>
 
     <section class="card" id="pharmacy-tools" hidden>
-      <h2>Colar promoção (WhatsApp ou site)</h2>
-      <p class="hint">Cole o texto da promoção. O app tenta achar preço, preço antigo e validade; você confere antes de salvar.</p>
-      <textarea id="paste-text" rows="4" placeholder="Ex: Fralda Pampers G 56un - de R$ 89,90 por R$ 59,90 - validade 03/2027"></textarea>
-      <div class="row-between wrap">
-        <button type="button" id="parse-btn" class="btn">Preencher formulário</button>
-        <span id="parse-status" class="status"></span>
+      <h2>Registrar promoção por print</h2>
+      <p class="hint">Tire um print da promoção (WhatsApp, site, anúncio) e cole aqui com Ctrl+V, ou toque pra escolher a foto. O app lê o texto e registra sozinho.</p>
+      <div id="dropzone" class="dropzone" tabindex="0">
+        <strong>Cole o print aqui (Ctrl+V)</strong>
+        <span class="muted">ou toque pra escolher uma imagem</span>
+        <input type="file" id="image-input" accept="image/*" hidden />
       </div>
+      <p id="ocr-status" class="status"></p>
+      <div id="recent-captures" class="captures"></div>
+      <details class="text-fallback">
+        <summary>Não tenho print: colar o texto</summary>
+        <textarea id="paste-text" rows="3" placeholder="Ex: Fralda Pampers G 56un - de R$ 89,90 por R$ 59,90 - validade 03/2027"></textarea>
+        <div class="row-between">
+          <button type="button" id="text-btn" class="btn small">Registrar texto</button>
+        </div>
+      </details>
     </section>
 
     <section class="card" id="pharmacy-links" hidden>
@@ -106,8 +126,9 @@
     </section>
 
     <section class="card">
-      <h2>Adicionar ou editar item</h2>
-      <p class="hint">Use pra Facebook Marketplace, promoções de farmácia ou qualquer item que você queira comparar.</p>
+      <details>
+        <summary><h2>Adicionar item manualmente</h2></summary>
+        <p class="hint">Pra Facebook Marketplace ou qualquer item que você queira comparar, sem print.</p>
       <form id="manual-form" class="form-grid">
         <label>Seção
           <select id="m-section">
@@ -144,6 +165,7 @@
           <span id="manual-status" class="status"></span>
         </div>
       </form>
+      </details>
     </section>
   </main>
 

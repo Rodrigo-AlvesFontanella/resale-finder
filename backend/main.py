@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from . import models
 from .database import Base, engine, get_db
-from .parsing import parse_promo
+from .parsing import TZ, parse_promo
 from .scoring import compute_group_median, score_listing
 from .scraper import ScrapeError, search_olx
 
@@ -37,6 +37,7 @@ def ensure_schema():
     additions = {
         "section": "VARCHAR DEFAULT 'revenda'",
         "expires_at": "VARCHAR",
+        "promo_ends_at": "VARCHAR",
         "hidden": "BOOLEAN DEFAULT FALSE",
         "prev_price": "FLOAT",
         "min_price": "FLOAT",
@@ -72,6 +73,7 @@ class ManualItem(BaseModel):
     section: str = "revenda"
     old_price: float | None = None
     expires_at: str | None = None
+    promo_ends_at: str | None = None
     url: str | None = None
     description: str | None = None
     location: str | None = None
@@ -97,6 +99,7 @@ class IngestRequest(BaseModel):
 
 class ListingPatch(BaseModel):
     hidden: bool | None = None
+    promo_ends_at: str | None = None
 
 
 class ParseRequest(BaseModel):
@@ -129,6 +132,39 @@ def expiry_status(expires_at: str | None):
     if months <= EXPIRY_WARNING_MONTHS:
         return {"level": "atencao", "text": f"vence em {months} mes(es) ({expires_at})"}
     return {"level": "ok", "text": f"vence em {expires_at}"}
+
+
+def normalize_promo_end(value: str | None) -> str | None:
+    """Aceita ISO com ou sem fuso (sem fuso = horario de Sao Paulo) e guarda em UTC."""
+    if not value or not value.strip():
+        return None
+    try:
+        dt = datetime.fromisoformat(value.strip())
+    except ValueError:
+        raise HTTPException(400, "Prazo da promocao em formato invalido")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=TZ)
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def promo_status(ends_iso: str | None):
+    if not ends_iso:
+        return None
+    end = datetime.fromisoformat(ends_iso)
+    remaining = end - datetime.now(timezone.utc)
+    if remaining <= timedelta(0):
+        return {"level": "encerrada", "text": "promoção encerrada", "remaining_minutes": 0}
+    total_minutes = int(remaining.total_seconds() // 60)
+    if total_minutes <= 6 * 60:
+        hours, minutes = divmod(total_minutes, 60)
+        text = f"acaba em {hours}h{minutes:02d}min" if hours else f"acaba em {minutes} min"
+        return {"level": "urgente", "text": text, "remaining_minutes": total_minutes}
+    local_end = end.astimezone(TZ)
+    return {
+        "level": "ativa",
+        "text": f"até {local_end:%d/%m} às {local_end:%H:%M}",
+        "remaining_minutes": total_minutes,
+    }
 
 
 def record_price(db: Session, listing: models.Listing, price: float):
@@ -259,6 +295,8 @@ def to_dict(listing: models.Listing) -> dict:
         "posted_at_text": listing.posted_at_text,
         "expires_at": listing.expires_at,
         "expiry": expiry_status(listing.expires_at),
+        "promo_ends_at": listing.promo_ends_at,
+        "promo": promo_status(listing.promo_ends_at),
         "hidden": bool(listing.hidden),
         "description": listing.description,
         "price_score": listing.price_score,
@@ -370,12 +408,28 @@ def api_listings(
         q = q.filter(models.Listing.search_term == search_term)
     if not include_hidden:
         q = q.filter(models.Listing.hidden.isnot(True))
-    total = q.count()
-    q = q.order_by(models.Listing.priority_score.desc())
+    items = [to_dict(l) for l in q.all()]
+
+    def rank(item):
+        ended = (item["promo"] and item["promo"]["level"] == "encerrada") or (
+            item["expiry"] and item["expiry"]["level"] == "vencido"
+        )
+        return (1 if ended else 0, -(item["priority_score"] or 0))
+
+    items.sort(key=rank)
+    total = len(items)
     if limit > 0:
-        q = q.limit(limit)
-    listings = q.all()
-    return {"total": total, "count": len(listings), "items": [to_dict(l) for l in listings]}
+        items = items[:limit]
+    return {"total": total, "count": len(items), "items": items}
+
+
+@app.get("/api/listings/batch")
+def api_listings_batch(ids: str = "", db: Session = Depends(get_db)):
+    wanted = [int(i) for i in ids.split(",") if i.strip().isdigit()][:200]
+    if not wanted:
+        return {"items": []}
+    rows = db.query(models.Listing).filter(models.Listing.id.in_(wanted)).all()
+    return {"items": [to_dict(l) for l in rows]}
 
 
 @app.get("/api/listings/{listing_id}/history")
@@ -419,9 +473,22 @@ def api_manual(payload: ManualItem, db: Session = Depends(get_db)):
     section = validate_section(payload.section)
     expires_at = normalize_expiry(payload.expires_at)
 
+    promo_ends_at = normalize_promo_end(payload.promo_ends_at)
     url = payload.url or f"manual://{section}/{search_term}/{payload.title}"
 
     listing = db.query(models.Listing).filter(models.Listing.url == url).first()
+    if listing is None and url.startswith("manual://farmacia/promo/"):
+        listing = (
+            db.query(models.Listing)
+            .filter(
+                models.Listing.section == section,
+                models.Listing.title == payload.title,
+                models.Listing.price == payload.price,
+                models.Listing.expires_at == expires_at,
+                models.Listing.hidden.isnot(True),
+            )
+            .first()
+        )
     if listing is None:
         listing = models.Listing(
             section=section,
@@ -439,6 +506,8 @@ def api_manual(payload: ManualItem, db: Session = Depends(get_db)):
     listing.description = payload.description
     listing.location = payload.location
     listing.search_term = search_term
+    if promo_ends_at:
+        listing.promo_ends_at = promo_ends_at
     record_price(db, listing, payload.price)
     db.commit()
 
@@ -455,6 +524,8 @@ def api_patch(listing_id: int, payload: ListingPatch, db: Session = Depends(get_
         raise HTTPException(404, "Item nao encontrado")
     if payload.hidden is not None:
         listing.hidden = payload.hidden
+    if "promo_ends_at" in payload.model_fields_set:
+        listing.promo_ends_at = normalize_promo_end(payload.promo_ends_at)
     db.commit()
     db.refresh(listing)
     return to_dict(listing)
